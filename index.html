@@ -1,0 +1,235 @@
+<!DOCTYPE html>
+<html lang="id">
+<head>
+    <meta charset="UTF-8" />
+    <title>Presensi Online</title>
+    <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no" />
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            background: linear-gradient(135deg, #ff9a9e, #fad0c4);
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            height: 100vh;
+            margin: 0;
+            overflow-x: hidden;
+        }
+        .splash { text-align: center; cursor: pointer; padding: 0 10px; }
+        .logo {
+            width: 150px; height: 150px; border-radius: 50%; background: white;
+            display: flex; justify-content: center; align-items: center;
+            font-size: 60px; color: #ff4d88;
+            box-shadow: 0 6px 15px rgba(0,0,0,0.2); margin: auto;
+        }
+        .splash p { margin-top: 20px; font-size: 18px; color: #fff; font-weight: bold; }
+        .card {
+            background: white; padding: 20px 20px 30px;
+            border-radius: 12px;
+            width: 95vw;
+            max-width: 420px;
+            box-shadow: 0 6px 15px rgba(0,0,0,0.15);
+            text-align: center;
+            display: none;
+            box-sizing: border-box;
+        }
+        .welcome { font-size: 20px; font-weight: bold; color: #ff4d88; margin-bottom: 8px; }
+        .date { font-size: 14px; color: #888; margin-bottom: 4px; }
+        .clock { font-size: 28px; font-weight: bold; margin-bottom: 4px; }
+        .day { color: #666; margin-bottom: 20px; }
+        button {
+            padding: 12px 25px; font-size: 16px; border: none;
+            border-radius: 25px; background: #ff4d88; color: white; cursor: pointer;
+            margin: 5px 10px;
+            min-width: 130px;
+            transition: background-color 0.3s ease;
+        }
+        button:hover:not(:disabled) { background: #e6005c; }
+        button:disabled { background: #ccc; cursor: not-allowed; color: #666; }
+        .result {
+            margin-top: 20px;
+            font-weight: bold;
+            text-align: left;
+            font-size: 15px;
+            line-height: 1.3;
+            word-wrap: break-word;
+            white-space: pre-line;
+        }
+        .late { color: red; }
+        .ontime { color: green; }
+        #map {
+            margin-top: 15px;
+            width: 100%;
+            height: 250px;
+            border-radius: 8px;
+            box-shadow: 0 2px 8px rgba(0,0,0,0.15);
+        }
+    </style>
+</head>
+<body>
+
+<!-- HALAMAN LOGO -->
+<div class="splash" id="splash" onclick="openAbsensi()">
+    <div class="logo">🕒</div>
+    <p>Klik Logo Presensi</p>
+</div>
+
+<!-- HALAMAN ABSENSI -->
+<div class="card" id="absensi">
+    <div class="welcome">Hai, Selamat Datang Loveta Della</div>
+    <div class="date" id="date">-</div>
+    <div class="clock" id="clock">00:00:00</div>
+    <div class="day" id="day">-</div>
+
+    <button id="btnMasuk" onclick="presensiMasuk()">Presensi Masuk</button>
+    <button id="btnKeluar" onclick="presensiKeluar()">Presensi Keluar</button>
+    <button id="btnLogout" onclick="logout()">Log Out</button>
+
+    <div class="result" id="result"></div>
+    <div id="map"></div>
+</div>
+
+<script>
+    let map, marker;
+    let sudahMasuk = false;
+    let sudahKeluar = false;
+    let riwayat = { masuk: null, keluar: null };
+
+    function openAbsensi() {
+        document.getElementById("splash").style.display = "none";
+        document.getElementById("absensi").style.display = "block";
+        updateDateTime();
+        setInterval(updateDateTime, 1000);
+    }
+
+    function updateDateTime() {
+        const now = new Date();
+        const hours = String(now.getHours()).padStart(2,'0');
+        const minutes = String(now.getMinutes()).padStart(2,'0');
+        const seconds = String(now.getSeconds()).padStart(2,'0');
+
+        const days = ["Minggu","Senin","Selasa","Rabu","Kamis","Jumat","Sabtu"];
+        const dayName = days[now.getDay()];
+
+        const months = ["Januari","Februari","Maret","April","Mei","Juni","Juli","Agustus","September","Oktober","November","Desember"];
+        const date = now.getDate();
+        const month = months[now.getMonth()];
+        const year = now.getFullYear();
+
+        document.getElementById("clock").innerText = `${hours}:${minutes}:${seconds}`;
+        document.getElementById("day").innerText = dayName;
+        document.getElementById("date").innerText = `${dayName}, ${date} ${month} ${year}`;
+    }
+
+    function tampilPresensi(statusType) {
+        if (statusType === "masuk" && sudahMasuk) { alert("Kamu sudah presensi masuk!"); return; }
+        if (statusType === "keluar" && sudahKeluar) { alert("Kamu sudah presensi keluar!"); return; }
+
+        const now = new Date();
+        const hours = now.getHours();
+        const minutes = now.getMinutes();
+        const timeString = now.toLocaleTimeString('id-ID');
+
+        const days = ["Minggu","Senin","Selasa","Rabu","Kamis","Jumat","Sabtu"];
+        const dayName = days[now.getDay()];
+        const months = ["Januari","Februari","Maret","April","Mei","Juni","Juli","Agustus","September","Oktober","November","Desember"];
+        const date = now.getDate();
+        const month = months[now.getMonth()];
+        const year = now.getFullYear();
+        const fullDate = `${dayName}, ${date} ${month} ${year}`;
+
+        let status = "";
+        let className = "";
+
+        if (statusType === "masuk") {
+            status = (hours > 8 || (hours === 8 && minutes > 0)) ? "Terlambat" : "Tepat Waktu";
+            className = (status === "Terlambat") ? "late" : "ontime";
+            sudahMasuk = true;
+            riwayat.masuk = { time: timeString, date: fullDate, status, className };
+            document.getElementById("btnMasuk").disabled = true;
+        } else if (statusType === "keluar") {
+            status = "Keluar";
+            className = "ontime";
+            sudahKeluar = true;
+            riwayat.keluar = { time: timeString, date: fullDate, status, className };
+            document.getElementById("btnKeluar").disabled = true;
+        }
+
+        tampilRiwayat();
+        deteksiLokasi(statusType);
+    }
+
+    function tampilRiwayat() {
+        const resultEl = document.getElementById("result");
+        let html = "";
+        if (riwayat.masuk) {
+            html += `Presensi Masuk:\nJam: ${riwayat.masuk.time}\nTanggal: ${riwayat.masuk.date}\nStatus: <span class="${riwayat.masuk.className}">${riwayat.masuk.status}</span>\n\n`;
+        }
+        if (riwayat.keluar) {
+            html += `Presensi Keluar:\nJam: ${riwayat.keluar.time}\nTanggal: ${riwayat.keluar.date}\nStatus: <span class="${riwayat.keluar.className}">${riwayat.keluar.status}</span>\n`;
+        }
+        resultEl.innerHTML = html.replace(/\n/g, '<br>');
+    }
+
+    function deteksiLokasi(statusType) {
+        if (navigator.geolocation) {
+            navigator.geolocation.getCurrentPosition(
+                (position) => {
+                    const lat = position.coords.latitude;
+                    const lon = position.coords.longitude;
+
+                    if (!map) {
+                        map = new google.maps.Map(document.getElementById("map"), {
+                            center: { lat: lat, lng: lon },
+                            zoom: 16,
+                        });
+                        marker = new google.maps.Marker({
+                            position: { lat: lat, lng: lon },
+                            map: map,
+                            title: `Lokasi ${statusType}`,
+                        });
+                    } else {
+                        const pos = { lat: lat, lng: lon };
+                        map.setCenter(pos);
+                        marker.setPosition(pos);
+                        marker.setTitle(`Lokasi ${statusType}`);
+                    }
+                },
+                (error) => {
+                    alert("Lokasi tidak tersedia atau izin ditolak!");
+                    document.getElementById("map").innerHTML = "";
+                }
+            );
+        } else {
+            alert("Browser tidak mendukung geolokasi");
+            document.getElementById("map").innerHTML = "";
+        }
+    }
+
+    function presensiMasuk() { tampilPresensi("masuk"); }
+    function presensiKeluar() { tampilPresensi("keluar"); }
+
+    function logout() {
+        sudahMasuk = false;
+        sudahKeluar = false;
+        riwayat = { masuk: null, keluar: null };
+        document.getElementById("btnMasuk").disabled = false;
+        document.getElementById("btnKeluar").disabled = false;
+        document.getElementById("result").innerHTML = "";
+        if (map) {
+            map = null;
+            marker = null;
+            document.getElementById("map").innerHTML = "";
+        }
+        document.getElementById("absensi").style.display = "none";
+        document.getElementById("splash").style.display = "block";
+    }
+</script>
+
+<!-- Ganti API key ini dengan API Key Google Maps yang valid -->
+<script async defer
+  src="https://maps.googleapis.com/maps/api/js?key=YOUR_API_KEY_HERE">
+</script>
+
+</body>
+</html>
